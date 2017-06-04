@@ -1,6 +1,10 @@
 
-
-
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define BLOCK_SIZE 1024
 
