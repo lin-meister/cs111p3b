@@ -1,0 +1,9 @@
+	
+- Check for reserved consists of:
+	- Check if it is in the superblock or group descriptor
+	- Check if it is part of the block fre list or inode free list (in block/inode bitmap)
+	- Check if it is in inode range (inode table)
+
+- Check for unreserved 
+	- Initially block state is "none" -> "in-use" -> "dup"
+	- If neither of those states, then block is unreferenced
