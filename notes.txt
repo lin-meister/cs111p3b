@@ -1,9 +1,48 @@
-	
+
 - Check for reserved consists of:
 	- Check if it is in the superblock or group descriptor
 	- Check if it is part of the block fre list or inode free list (in block/inode bitmap)
 	- Check if it is in inode range (inode table)
 
-- Check for unreserved 
+- Check for unreserved
 	- Initially block state is "none" -> "in-use" -> "dup"
 	- If neither of those states, then block is unreferenced
+
+- Commented code for later use
+// fd = open(csvFile, O_RDONLY);
+// if (fd == -1)
+//   error("Unable to open csv file");
+//
+// // Read the csv
+// struct stat st;
+// fstat(fd, &st);
+// csvFileSize = st.st_size;
+//
+// csv = (char*) malloc(csvFileSize);
+// if (read(fd, csv, csvFileSize) == -1)
+//   error("Unable to read csv file");
+//
+// char * pch;
+//
+// pch = strtok(csv, "\n,");
+// while (pch != NULL) {
+//   printf("%s\n", pch);
+//   if (strcmp(pch, "SUPERBLOCK") == 0) {
+//     pch = strtok(NULL, "\n");
+//   //   getSuperblockInfo(pch);
+//   }
+//   else if (strcmp(pch, "BFREE") == 0) {
+//     pch = strtok(NULL, "\n");
+//   //   getBlockBitmapInfo(pch);
+//   }
+//   else if (strcmp(pch, "DIRENT") == 0) {
+//     pch = strtok(NULL, "\n");
+//   //   testBlockConsistency(pch);
+//   }
+//   else
+//       pch = strtok(NULL, "\n,");
+// }
+//
+// int * temp = freeBlocks;
+// for (; temp != NULL; temp++)
+//   printf("%d ", *temp);

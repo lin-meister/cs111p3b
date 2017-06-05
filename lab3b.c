@@ -12,7 +12,7 @@ int csvFileSize;
 
 int numBlocks, numInodes;
 
-int * freeBlocks;
+char * freeBlocks;
 
 int fd;
 
@@ -37,50 +37,77 @@ void error(char* msg)
 }
 
 void getSuperblockInfo(char* str) {
-  char temp[strlen(str)];
-  strcpy(temp, str);
-  char * tok = strtok(temp, ",");
-  tok[strlen(tok)+1] = '\0';
+  char * tok = strtok(str, ",");
 
   int num = 1;
-  while (tok != NULL) {
+  for (; tok != NULL; tok = strtok(NULL, ","), num++) {
     if (num == 2) numBlocks = atoi(tok);
     else if (num == 3) numInodes = atoi(tok);
-    num++;
-    tok = strtok(NULL, ",");
   }
 }
 
-void getBlockBitmapInfo(char* str) {
-    printf("Hello\n");
-  char temp[strlen(str)];
-  strcpy(temp, str);
-  char * tok = strtok(temp, ",");
-  tok[strlen(tok)+1] = '\0';
+void getBlockFreeListInfo(char* str) {
+    char* tok = strtok(str, ",");
 
-  freeBlocks = (int*) malloc(numBlocks);
+  // char temp[strlen(str)];
+  // strcpy(temp, str);
+  // char * tok = strtok(temp, ",");
+  // tok[strlen(tok)+1] = '\0';
+
   int num = 1;
   for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-    if (num == 2)
-      freeBlocks[atoi(tok)] = 1;
+    if (num == 2) freeBlocks[atoi(tok)] = 'F';
   }
 }
 
-void testBlockConsistency(char* str) {
-  char temp[strlen(str)];
-  strcpy(temp, str);
-  char * tok = strtok(temp, ",");
-  tok[strlen(tok)+1] = '\0';
+void testDirectBlocksInInode(char* str) {
+    char * tok = strtok(str, ",");
 
-  int num = 1, parentInodeNum = 0, blockNum = 0, offset = 0;
-  for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-    if (num == 2) parentInodeNum = atoi(tok);
-    else if (num == 3) offset = atoi(tok);
-    else if (num == 4) blockNum = atoi(tok);
+  int num = 1, inodeNum = 0, blockNum = 0;
+  for (; num < 13; num++) {
+      if (num == 2) inodeNum = atoi(tok);
+      tok = strtok(NULL, ",");
   }
 
-  if (blockNum < 0 || blockNum > numBlocks - 1 || parentInodeNum < 1 || parentInodeNum > numInodes)
-    fprintf(stdout, "INVALID BLOCK IN INODE %d AT OFFSET %d\n", parentInodeNum, offset);
+  int offset = 0;
+  for (; tok != NULL; tok = strtok(NULL, ","), offset++) {
+    blockNum = atoi(tok);
+    // Mark the block as allocated in our dictionary
+    freeBlocks[blockNum] = 'A';
+    if (blockNum < 0 || blockNum > numBlocks - 1 || inodeNum < 1 || inodeNum > numInodes)
+      fprintf(stdout, "INVALID BLOCK %d IN INODE %d AT OFFSET %d\n", blockNum, inodeNum, offset);
+  }
+}
+
+void testIndirectBlocks(char* str) {
+    char * tok = strtok(str, ",");
+
+  int num = 1, inodeNum = 0, offset = 0, referencedBlockNum = 0, level = 0;
+  for (; num < 13; num++) {
+      if (num == 2) inodeNum = atoi(tok);
+      else if (num == 3) level = atoi(tok);
+      else if (num == 4) offset = atoi(tok);
+      else if (num == 6) referencedBlockNum = atoi(tok);
+      tok = strtok(NULL, ",");
+  }
+  freeBlocks[referencedBlockNum] = 'A';
+
+  char * levelDesc;
+  switch (level) {
+      case 1: levelDesc = ""; break;
+      case 2: levelDesc = "DOUBLE "; break;
+      case 3: levelDesc = "TRIPLE "; break;
+  }
+  if (referencedBlockNum < 0 || referencedBlockNum > numBlocks - 1 || inodeNum < 1 || inodeNum > numInodes)
+    fprintf(stdout, "INVALID %s INDIRECT BLOCK %d IN INODE %d AT OFFSET %d\n", levelDesc, referencedBlockNum, inodeNum, offset);
+}
+
+void testUnreferencedBlocks() {
+    int i;
+    for (i = 0; i < numBlocks; i++) {
+        if (freeBlocks[i] != 'F' && freeBlocks[i] != 'A')
+            fprintf(stdout, "UNREFERENCED BLOCK %d\n", i);
+    }
 }
 
 int
@@ -92,47 +119,42 @@ main (int argc, char **argv)
     exit(1);
   }
 
+  numBlocks = -1, numInodes = -1;
   csv = NULL, freeBlocks = NULL;
 
   //Check to see if we can open provided csv
   char * csvFile = argv[1];
-  fd = open(csvFile, O_RDONLY);
-  if (fd == -1)
-    error("Unable to open csv file");
 
-  // Read the csv
-  struct stat st;
-  fstat(fd, &st);
-  csvFileSize = st.st_size;
-
-  csv = (char*) malloc(csvFileSize);
-  if (read(fd, csv, csvFileSize) == -1)
-    error("Unable to read csv file");
-
-  char * pch;
-
-  pch = strtok(csv, "\n,");
-  while (pch != NULL) {
-    printf("%s\n", pch);
-    if (strcmp(pch, "SUPERBLOCK") == 0) {
-      pch = strtok(NULL, "\n");
-      getSuperblockInfo(pch);
-    }
-    else if (strcmp(pch, "BFREE") == 0) {
-      pch = strtok(NULL, "\n");
-    //   getBlockBitmapInfo(pch);
-    }
-    else if (strcmp(pch, "DIRENT") == 0) {
-      pch = strtok(NULL, "\n");
-    //   testBlockConsistency(pch);
-    }
-    else
-        pch = strtok(NULL, "\n,");
+  FILE* stream = fopen(csvFile, "r");
+  char line[1024];
+  while (fgets(line, 1024, stream)) {
+      char * temp = strdup(line);
+      char * pch = strtok(temp, ",");
+      if (strcmp(pch, "SUPERBLOCK") == 0) {
+        getSuperblockInfo(line);
+        if (numBlocks > -1)
+            freeBlocks = (char*) malloc(sizeof(char) * numBlocks);
+      }
+      else if (strcmp(pch, "BFREE") == 0) {
+        getBlockFreeListInfo(line);
+      }
+      else if (strcmp(pch, "INODE") == 0) {
+          // the direct block info is all in the inode rows
+        testDirectBlocksInInode(line);
+      }
+      else if (strcmp(pch, "INDIRECT") == 0) {
+        testIndirectBlocks(line);
+      }
+      free(temp);
   }
 
-  int * temp = freeBlocks;
-  for (; temp != NULL; temp++)
-    printf("%d ", *temp);
+  // printf("%d,%d\n", numBlocks, numInodes);
+  // int i;
+  // for (i = 0; i < numBlocks; i++) {
+  //     printf("%d:%c\n", i, freeBlocks[i]);
+  // }
+
+  testUnreferencedBlocks();
 
   // Free memory
   freeMemory();
