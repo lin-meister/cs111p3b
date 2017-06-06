@@ -72,8 +72,11 @@ void testDirectBlocksInInode(char* str) {
   int offset = 0;
   for (; tok != NULL; tok = strtok(NULL, ","), offset++) {
     blockNum = atoi(tok);
-    // Mark the block as allocated in our dictionary
-    freeBlocks[blockNum] = 'A';
+    // Mark the block as allocated in our dictionary unless it is supposed to be free
+    if (freeBlocks[referencedBlockNum] == 'F')
+      fprintf(stdout, "ALLOCATED BLOCK %d ON FREELIST\n", referencedBlockNum);
+    else
+        freeBlocks[blockNum] = 'A';
     if (blockNum < 0 || blockNum > numBlocks - 1 || inodeNum < 1 || inodeNum > numInodes)
       fprintf(stdout, "INVALID BLOCK %d IN INODE %d AT OFFSET %d\n", blockNum, inodeNum, offset);
   }
@@ -90,7 +93,10 @@ void testIndirectBlocks(char* str) {
       else if (num == 6) referencedBlockNum = atoi(tok);
       tok = strtok(NULL, ",");
   }
-  freeBlocks[referencedBlockNum] = 'A';
+  if (freeBlocks[referencedBlockNum] == 'F')
+    fprintf(stdout, "ALLOCATED BLOCK %d ON FREELIST\n", referencedBlockNum);
+  else
+    freeBlocks[referencedBlockNum] = 'A';
 
   char * levelDesc;
   switch (level) {
