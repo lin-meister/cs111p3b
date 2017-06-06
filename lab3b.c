@@ -5,8 +5,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define BLOCK_SIZE 1024
-#define INODE_SIZE 128
+unsigned int BLOCK_SIZE = 1024;
+unsigned int INODE_SIZE = 128;
 
 char * csv;
 int csvFileSize;
@@ -50,6 +50,8 @@ void getSuperblockInfo(char* str) {
   for (; tok != NULL; tok = strtok(NULL, ","), num++) {
     if (num == 2) numBlocks = atoi(tok);
     else if (num == 3) numInodes = atoi(tok);
+    else if (num == 4) BLOCK_SIZE = atoi(tok);
+    else if (num == 5) INODE_SIZE = atoi(tok);
   }
 }
 
