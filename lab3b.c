@@ -153,7 +153,8 @@ void getInodeInfo(char* str) {
                 if(allocatedBlocks[blockNum].isDuplicated == 0)
                 {
                     allocatedBlocks[blockNum].isDuplicated = 1;
-                    fprintf(stdout, "DUPLICATE %sBLOCK %u IN INODE %u AT OFFSET %u\n", indirect, allocatedBlocks[blockNum].blockNum, allocatedBlocks[blockNum].parentInode, allocatedBlocks[blockNum].offset);
+                    char* thisIndirect = getIndirection(allocatedBlocks[blockNum].level);
+                    fprintf(stdout, "DUPLICATE %sBLOCK %u IN INODE %u AT OFFSET %u\n", thisIndirect, allocatedBlocks[blockNum].blockNum, allocatedBlocks[blockNum].parentInode, allocatedBlocks[blockNum].offset);
                 }
                 fprintf(stdout, "DUPLICATE %sBLOCK %u IN INODE %u AT OFFSET %u\n", indirect, blockNum, inodeNum, offset);
             }
