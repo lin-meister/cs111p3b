@@ -14,7 +14,8 @@ int csvFileSize;
 int numBlocks, numInodes;
 int reservedBlockMax;
 
-char * freeBlocks;
+char * blockStatus;
+char * inodeStatus;
 
 int fd;
 
@@ -25,8 +26,10 @@ void freeMemory()
 {
   if (csv != NULL)
     free(csv);
-  if (freeBlocks != NULL)
-    free(freeBlocks);
+  if (blockStatus != NULL)
+    free(blockStatus);
+  if (inodeStatus != NULL)
+    free(inodeStatus);
   //  free(superBlock);
   //  free(groupBlock);
   //  free(blockBitmap);
@@ -58,12 +61,14 @@ int isValidBlockNum(int block) {
 
 void getBlockFreeListInfo(char* str) {
     char* tok = strtok(str, ",");
+  int num = 1;
+  for (; tok != NULL; tok = strtok(NULL, ","), num++) {
+    if (num == 2) blockStatus[atoi(tok)] = 'F';
+  }
+}
 
-  // char temp[strlen(str)];
-  // strcpy(temp, str);
-  // char * tok = strtok(temp, ",");
-  // tok[strlen(tok)+1] = '\0';
-
+void getInodeFreeListInfo(char* str) {
+    char* tok = strtok(str, ",");
   int num = 1;
   for (; tok != NULL; tok = strtok(NULL, ","), num++) {
       if (num == 2) {
@@ -74,6 +79,15 @@ void getBlockFreeListInfo(char* str) {
               printf("INVALID BLOCK %d IN FREE LIST\n", blockNum);
         }
   }
+}
+
+
+void checkBlockStatus(int blockNum) {
+    // Mark the block as allocated in our dictionary unless it is supposed to be free
+    if (blockStatus[blockNum] == 'F')
+      fprintf(stdout, "ALLOCATED BLOCK %d ON FREELIST\n", blockNum);
+    else
+        blockStatus[blockNum] = 'A';
 }
 
 
@@ -89,8 +103,7 @@ void testDirectBlocksInInode(char* str) {
   int offset = 0;
   for (; tok != NULL; tok = strtok(NULL, ","), offset++) {
     blockNum = atoi(tok);
-    // Mark the block as allocated in our dictionary
-    freeBlocks[blockNum] = 'A';
+    checkBlockStatus(blockNum);
     if (blockNum < 0 || blockNum > numBlocks - 1 || inodeNum < 1 || inodeNum > numInodes)
       fprintf(stdout, "INVALID BLOCK %d IN INODE %d AT OFFSET %d\n", blockNum, inodeNum, offset);
   }
@@ -107,7 +120,8 @@ void testIndirectBlocks(char* str) {
       else if (num == 6) referencedBlockNum = atoi(tok);
       tok = strtok(NULL, ",");
   }
-  freeBlocks[referencedBlockNum] = 'A';
+
+  checkBlockStatus(referencedBlockNum);
 
   char * levelDesc;
   switch (level) {
@@ -122,7 +136,7 @@ void testIndirectBlocks(char* str) {
 void testUnreferencedBlocks() {
     int i;
     for (i = 0; i < numBlocks; i++) {
-        if (freeBlocks[i] != 'F' && freeBlocks[i] != 'A')
+        if (blockStatus[i] != 'F' && blockStatus[i] != 'A')
             fprintf(stdout, "UNREFERENCED BLOCK %d\n", i);
     }
 }
@@ -137,7 +151,7 @@ main (int argc, char **argv)
   }
 
   numBlocks = -1, numInodes = -1;
-  csv = NULL, freeBlocks = NULL;
+  csv = NULL, blockStatus = NULL, inodeStatus = NULL;
 
   //Check to see if we can open provided csv
   char * csvFile = argv[1];
@@ -150,16 +164,21 @@ main (int argc, char **argv)
       if (strcmp(pch, "SUPERBLOCK") == 0) {
         getSuperblockInfo(line);
         if (numBlocks > -1)
-            freeBlocks = (char*) malloc(sizeof(char) * (numBlocks-1));
+	  blockStatus = (char*) malloc(sizeof(char) * (numBlocks-1));
           
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
         int inodeTableBlocks = numInodes / inodesPerBlock;
-          printf("%u\n", inodeTableBlocks);
-          reservedBlockMax = 4 + inodeTableBlocks;
-        
+	printf("%u\n", inodeTableBlocks);
+	reservedBlockMax = 4 + inodeTableBlocks;
+    
+	inodeStatus = (char*) malloc(sizeof(char) * numInodes);
+
       }
       else if (strcmp(pch, "BFREE") == 0) {
         getBlockFreeListInfo(line);
+      }
+      else if (strcmp(pch, "IFREE") == 0) {
+        // getInodeFreeListInfo(line);
       }
       else if (strcmp(pch, "INODE") == 0) {
           // the direct block info is all in the inode rows
@@ -174,7 +193,7 @@ main (int argc, char **argv)
   // printf("%d,%d\n", numBlocks, numInodes);
   // int i;
   // for (i = 0; i < numBlocks; i++) {
-  //     printf("%d:%c\n", i, freeBlocks[i]);
+  //     printf("%d:%c\n", i, blockStatus[i]);
   // }
 
   testUnreferencedBlocks();
