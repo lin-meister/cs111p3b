@@ -6,15 +6,19 @@
 #include <stdlib.h>
 
 #define BLOCK_SIZE 1024
+#define INODE_SIZE 128
 
 char * csv;
 int csvFileSize;
 
 int numBlocks, numInodes;
+int reservedBlockMax;
 
 char * freeBlocks;
 
 int fd;
+
+
 
 //Free memory for all allocated blocks
 void freeMemory()
@@ -46,6 +50,12 @@ void getSuperblockInfo(char* str) {
   }
 }
 
+int isValidBlockNum(int block) {
+    if(block < numBlocks && block > reservedBlockMax)
+        return 1;
+    else return 0;
+}
+
 void getBlockFreeListInfo(char* str) {
     char* tok = strtok(str, ",");
 
@@ -56,9 +66,16 @@ void getBlockFreeListInfo(char* str) {
 
   int num = 1;
   for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-    if (num == 2) freeBlocks[atoi(tok)] = 'F';
+      if (num == 2) {
+          int blockNum = atoi(tok);
+          if(isValidBlockNum(blockNum))
+              freeBlocks[blockNum] = 'F';
+          else
+              printf("INVALID BLOCK %d IN FREE LIST\n", blockNum);
+        }
   }
 }
+
 
 void testDirectBlocksInInode(char* str) {
     char * tok = strtok(str, ",");
@@ -133,7 +150,13 @@ main (int argc, char **argv)
       if (strcmp(pch, "SUPERBLOCK") == 0) {
         getSuperblockInfo(line);
         if (numBlocks > -1)
-            freeBlocks = (char*) malloc(sizeof(char) * numBlocks);
+            freeBlocks = (char*) malloc(sizeof(char) * (numBlocks-1));
+          
+        int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
+        int inodeTableBlocks = numInodes / inodesPerBlock;
+          printf("%u\n", inodeTableBlocks);
+          reservedBlockMax = 4 + inodeTableBlocks;
+        
       }
       else if (strcmp(pch, "BFREE") == 0) {
         getBlockFreeListInfo(line);
