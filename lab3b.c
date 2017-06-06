@@ -29,9 +29,6 @@ char * inodeStatus;
 
 int fd;
 
-
-
-
 //Free memory for all allocated blocks
 void freeMemory()
 {
@@ -121,7 +118,7 @@ void getInodeInfo(char* str) {
     
     char* tok = strtok(str, ",");
 
-    int num = 1, inodeNum = 0, blockNum = 0;
+    int num = 1, inodeNum = 0, blockNum = 0, level = 0;
     for (; num < 13; num++) {
         if (num == 2) inodeNum = atoi(tok);
         tok = strtok(NULL, ",");
@@ -135,6 +132,19 @@ void getInodeInfo(char* str) {
         blockNum = atoi(tok);
         if (blockNum == 0)
             continue;
+        
+        switch (offset) {
+            case 12: level = 1; break;
+            case 13: level = 2; break;
+            case 14: level = 3; break;
+            default: level = 0; break;
+        }
+        switch (offset) {
+            case 13: offset = 12 + BLOCK_SIZE/4; break;
+            case 14: offset = 12 + BLOCK_SIZE/4 + (BLOCK_SIZE/4)*(BLOCK_SIZE/4); break;
+            default: break;
+        }
+        
         int rc = isValidBlockNum(blockNum);
         if (rc == 1)
         {
@@ -151,13 +161,8 @@ void getInodeInfo(char* str) {
             {
                 allocatedBlocks[blockNum].blockNum = blockNum;
                 allocatedBlocks[blockNum].parentInode = inodeNum;
+                allocatedBlocks[blockNum].level = level;
                 allocatedBlocks[blockNum].offset = offset;
-                switch (offset) {
-                    case 12: allocatedBlocks[blockNum].level = 1; break;
-                    case 13: allocatedBlocks[blockNum].level = 2; break;
-                    case 14: allocatedBlocks[blockNum].level = 3; break;
-                    default: allocatedBlocks[blockNum].level = 0; break;
-                }
             }
         }
         else if(rc == 0)
@@ -247,6 +252,14 @@ void testUnreferencedBlocks() {
     }
 }
 
+void testAllocatedBlocksConsistency() {
+    int i;
+    for (i = 0; i < numBlocks; i++) {
+        if(allocatedBlocks[i].blockNum != 0 && freeBlocks[i] == 1)
+            fprintf(stdout, "ALLOCATED BLOCK %d ON FREELIST\n", i);
+    }
+    
+}
 
 int
 main (int argc, char **argv)
@@ -307,7 +320,8 @@ main (int argc, char **argv)
   //     printf("%d:%c\n", i, blockStatus[i]);
   // }
 
-  testUnreferencedBlocks();
+    testUnreferencedBlocks();
+    testAllocatedBlocksConsistency();
 
   // Free memory
   freeMemory();
