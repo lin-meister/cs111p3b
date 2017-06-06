@@ -22,7 +22,7 @@ struct allocatedBlock {
     unsigned int isDuplicated;
 };
 
-struct allocatedInodes {
+struct allocatedInode {
     unsigned int inodeNum;
     unsigned int links;
 };
@@ -141,13 +141,13 @@ void getInodeInfo(char* str) {
     int num = 1, inodeNum = 0, blockNum = 0, linkCount = 0, level = 0;
     for (; num < 13; num++) {
         if (num == 2) inodeNum = atoi(tok);
-        else if (num == 7) linksCount = atoi(tok);
+        else if (num == 7) linkCount = atoi(tok);
         tok = strtok(NULL, ",");
     }
 
     if (isValidInodeNum(inodeNum)) {
         allocatedInodes[inodeNum].inodeNum = inodeNum;
-        allocatedInodes[inodeNum].links = linksCount;
+        allocatedInodes[inodeNum].links = linkCount;
     }
 
     int offset = 0;
