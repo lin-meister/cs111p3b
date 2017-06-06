@@ -71,7 +71,6 @@ void getInodeFreeListInfo(char* str) {
     char* tok = strtok(str, ",");
   int num = 1;
   for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-<<<<<<< HEAD
       if (num == 2) {
           int blockNum = atoi(tok);
           if(isValidBlockNum(blockNum))
@@ -82,10 +81,6 @@ void getInodeFreeListInfo(char* str) {
   }
 }
 
-=======
-    if (num == 2) inodeStatus[atoi(tok)] = 'F';
-  }
-}
 
 void checkBlockStatus(int blockNum) {
     // Mark the block as allocated in our dictionary unless it is supposed to be free
@@ -94,7 +89,7 @@ void checkBlockStatus(int blockNum) {
     else
         blockStatus[blockNum] = 'A';
 }
->>>>>>> b83f1f4a36166b72102ed9a7c6b6b14aff259c9f
+
 
 void testDirectBlocksInInode(char* str) {
     char * tok = strtok(str, ",");
@@ -169,18 +164,15 @@ main (int argc, char **argv)
       if (strcmp(pch, "SUPERBLOCK") == 0) {
         getSuperblockInfo(line);
         if (numBlocks > -1)
-<<<<<<< HEAD
-            freeBlocks = (char*) malloc(sizeof(char) * (numBlocks-1));
+	  blockStatus = (char*) malloc(sizeof(char) * (numBlocks-1));
           
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
         int inodeTableBlocks = numInodes / inodesPerBlock;
-          printf("%u\n", inodeTableBlocks);
-          reservedBlockMax = 4 + inodeTableBlocks;
-        
-=======
-            blockStatus = (char*) malloc(sizeof(char) * numBlocks);
-            inodeStatus = (char*) malloc(sizeof(char) * numInodes);
->>>>>>> b83f1f4a36166b72102ed9a7c6b6b14aff259c9f
+	printf("%u\n", inodeTableBlocks);
+	reservedBlockMax = 4 + inodeTableBlocks;
+    
+	inodeStatus = (char*) malloc(sizeof(char) * numInodes);
+
       }
       else if (strcmp(pch, "BFREE") == 0) {
         getBlockFreeListInfo(line);

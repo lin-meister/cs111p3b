@@ -59,11 +59,25 @@ int isValidBlockNum(int block) {
     else return 0;
 }
 
+int isValidInodeNum(int inum) {
+  if(num <= numInodes && num > 0)
+    return 1;
+  else return 0;
+}
+
 void getBlockFreeListInfo(char* str) {
     char* tok = strtok(str, ",");
   int num = 1;
   for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-    if (num == 2) blockStatus[atoi(tok)] = 'F';
+    if (num == 2)
+      {
+	int blockNum = atoi(tok);
+	if(isValidBlockNum(blockNum))
+	  blockStatus[blockNum] = 'F';
+	else
+	  printf("INVALID BLOCK %d IN FREE LIST\n", blockNum);
+		
+      }
   }
 }
 
@@ -72,11 +86,11 @@ void getInodeFreeListInfo(char* str) {
   int num = 1;
   for (; tok != NULL; tok = strtok(NULL, ","), num++) {
       if (num == 2) {
-          int blockNum = atoi(tok);
-          if(isValidBlockNum(blockNum))
-              freeBlocks[blockNum] = 'F';
+          int inodeNum = atoi(tok);
+          if(isValidInodeNum(inodeNum))
+              inodeStatus[inodeNum] = 'F';
           else
-              printf("INVALID BLOCK %d IN FREE LIST\n", blockNum);
+              printf("INVALID INODE %d IN FREE LIST\n", inodeNum);
         }
   }
 }
