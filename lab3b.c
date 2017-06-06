@@ -22,8 +22,15 @@ struct allocatedBlock {
     unsigned int isDuplicated;
 };
 
+struct allocatedInodes {
+    unsigned int inodeNum;
+    unsigned int links;
+};
+
 int * freeBlocks;
 struct allocatedBlock * allocatedBlocks;
+int * freeInodes;
+struct allocatedInode * allocatedInodes;
 
 char * inodeStatus;
 
@@ -96,6 +103,20 @@ void getBlockFreeListInfo(char* str) {
   }
 }
 
+void getInodeFreeListInfo(char* str) {
+    char* tok = strtok(str, ",");
+  int num = 1;
+  for (; tok != NULL; tok = strtok(NULL, ","), num++) {
+      if (num == 2) {
+          int inodeNum = atoi(tok);
+          if(isValidInodeNum(inodeNum))
+              freeInodes[inodeNum] = 1;
+          else
+              printf("INVALID INODE %d IN FREE LIST\n", inodeNum);
+        }
+  }
+}
+
 char* indirect = "INDIRECT ";
 char* doubleIndirect = "DOUBLE INDIRECT ";
 char* trippleIndirect = "TRIPPLE INDIRECT ";
@@ -115,13 +136,18 @@ char* getIndirection (unsigned int offset)
 }
 
 void getInodeInfo(char* str) {
-
     char* tok = strtok(str, ",");
 
-    int num = 1, inodeNum = 0, blockNum = 0, level = 0;
+    int num = 1, inodeNum = 0, blockNum = 0, linkCount = 0, level = 0;
     for (; num < 13; num++) {
         if (num == 2) inodeNum = atoi(tok);
+        else if (num == 7) linksCount = atoi(tok);
         tok = strtok(NULL, ",");
+    }
+
+    if (isValidInodeNum(inodeNum)) {
+        allocatedInodes[inodeNum].inodeNum = inodeNum;
+        allocatedInodes[inodeNum].links = linksCount;
     }
 
     int offset = 0;
@@ -212,24 +238,6 @@ void getIndirectBlock(char *str) {
         fprintf(stdout, "INVALID %sBLOCK %d IN INODE %d AT OFFSET %d\n", indirect, referencedBlockNum, inodeNum, offset);
 }
 
-
-
-
-void getInodeFreeListInfo(char* str) {
-    char* tok = strtok(str, ",");
-  int num = 1;
-  for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-      if (num == 2) {
-          int inodeNum = atoi(tok);
-          if(isValidInodeNum(inodeNum))
-              inodeStatus[inodeNum] = 'F';
-          else
-              printf("INVALID INODE %d IN FREE LIST\n", inodeNum);
-        }
-  }
-}
-
-
 /*void checkBlockStatus(int blockNum) {
     // Mark the block as allocated in our dictionary unless it is supposed to be free
     if (freeBlocks[blockNum] == 1)
@@ -258,7 +266,16 @@ void testAllocatedBlocksConsistency() {
         if(allocatedBlocks[i].blockNum != 0 && freeBlocks[i] == 1)
             fprintf(stdout, "ALLOCATED BLOCK %d ON FREELIST\n", i);
     }
+}
 
+void testInodeAllocation() {
+    int i;
+    for (i = 0; i < numInodes; i++) {
+        if (allocatedInodes[i].inodeNum != 0 && freeInodes[i] == 1)
+            fprintf(stdout, "ALLOCATED INODE %d ON FREELIST\n", i);
+        else if (allocatedInodes[i].inodeNum == 0 && freeInodes[i] == 0)
+            fprintf(stdout, "UNALLOCATED INODE %d NOT ON FREELIST\n", i);
+    }
 }
 
 int
@@ -289,6 +306,10 @@ main (int argc, char **argv)
             memset(freeBlocks, 0, sizeof(int) * numBlocks);
             allocatedBlocks = (struct allocatedBlock *) malloc(sizeof(struct allocatedBlock) * numBlocks);
             memset(allocatedBlocks, 0, sizeof(struct allocatedBlock) * numBlocks);
+            freeInodes = (int*) malloc(sizeof(int) * (numInodes));
+            memset(freeInodes, 0, sizeof(int) * numInodes);
+            allocatedInodes = (struct allocatedInode *) malloc(sizeof(struct allocatedInode) * numInodes);
+            memset(allocatedInodes, 0, sizeof(struct allocatedInode) * numInodes);
         }
 
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
