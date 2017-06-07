@@ -1,3 +1,7 @@
+# NAME: Nikhil Bhatia, Chaoran Lin
+# UID: 104132751, 004674598
+# EMAIL: nbhatia823@ucla.edu, linmc@ucla.edu
+
 CC=gcc
 CFLAGS=-lm -o
 EXECNAME=lab3b
