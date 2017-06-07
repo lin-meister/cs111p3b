@@ -81,7 +81,7 @@ int isValidBlockNum(int block) {
 }
 
 int isValidInodeNum(int num) {
-  if(num <= numInodes && num > 0)
+  if((num <= numInodes && num >= firstNonreservedInode) || num == 2  )
     return 1;
   else return 0;
 }
@@ -148,16 +148,17 @@ void getInodeInfo(char* str) {
         tok = strtok(NULL, ",");
     }
 
-    if(mode == 0)
-        return;
     
     if (isValidInodeNum(inodeNum)) {
+        if(mode == 0)
+            return;
         allocatedInodes[inodeNum].inodeNum = inodeNum;
         allocatedInodes[inodeNum].linkCount = linkCount;
     }
-    else
+    else    {
         fprintf(stdout, "INVALID INODE %d\n", inodeNum);
-    
+        return;
+    }
     int offset = 0;
     char * indirect = "";
 
@@ -259,14 +260,32 @@ void getIndirectBlock(char *str) {
 void getDirectoryEntry(char *str) {
     char * tok = strtok(str, ",");
 
-    int num = 1, inode = 0;
+    int num = 1, inodeNum = 0, directoryInodeNum = 0, nameLength = 0;
     char* name;
     for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-        if(num == 4) inode = atoi(tok);
+        if(num == 2) directoryInodeNum = atoi(tok);
+        if(num == 4) inodeNum = atoi(tok);
+        if(num == 6) nameLength = atoi(tok);
         if(num == 7) name = strdup(tok);
     }
+    name[nameLength+2] = '\0';
+
+    if(isValidInodeNum(inodeNum) == 0) {
+        fprintf(stdout, "DIRECTORY INODE %d NAME %s INVALID INODE %d\n", directoryInodeNum, name, inodeNum);
+        return;
+    }
+    if(freeInodes[inodeNum] == 1){
+        fprintf(stdout, "DIRECTORY INODE %d NAME %s UNALLOCATED INODE %d\n", directoryInodeNum, name, inodeNum);
+        return;
+    }
     
-    allocatedInodes[inode].directoryLinks++;
+    if(strcmp(name, ".") == 0 && directoryInodeNum != inodeNum)
+        fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
+    else if(strcmp(name, "..") == 0 && directoryInodeNum == 2)
+        fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
+        
+    
+    allocatedInodes[inodeNum].directoryLinks++;
     
 }
 
