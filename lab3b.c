@@ -32,10 +32,18 @@ struct allocatedInode {
     char fileType;
 };
 
-int * freeBlocks;
+struct dirEntry {
+  unsigned int directoryInode;
+  unsigned int inodeNum;
+  char* name;
+};
+
+int * freeBlocks; 
 struct allocatedBlock * allocatedBlocks;
 int * freeInodes;
 struct allocatedInode * allocatedInodes;
+struct dirEntry * dirEntries; 
+
 
 int fd;
 
@@ -253,18 +261,12 @@ void getIndirectBlock(char *str) {
         fprintf(stdout, "INVALID %sBLOCK %d IN INODE %d AT OFFSET %d\n", indirect, referencedBlockNum, inodeNum, offset);
 }
 
-/*void checkBlockStatus(int blockNum) {
-    // Mark the block as allocated in our dictionary unless it is supposed to be free
-    if (freeBlocks[blockNum] == 1)
-      fprintf(stdout, "ALLOCATED BLOCK %d ON FREELIST\n", blockNum);
-    else
-        blockStatus[blockNum] = 'A';
-}
-*/
+
 
 void getDirectoryEntry(char *str) {
     char * tok = strtok(str, ",");
 
+    //Populate variables from CSV line
     int num = 1, inodeNum = 0, directoryInodeNum = 0, nameLength = 0;
     char* name;
     for (; tok != NULL; tok = strtok(NULL, ","), num++) {
@@ -273,38 +275,39 @@ void getDirectoryEntry(char *str) {
         if(num == 6) nameLength = atoi(tok);
         if(num == 7) name = strdup(tok);
     }
-    name[nameLength+2] = '\0';
 
+    //Replace newline characrter with nullbyte at end of name
+    name[nameLength+2] = '\0';    
+
+    //Check if inodeNum is valid, if not print error
     if(isValidInodeNum(inodeNum) == 0) {
         fprintf(stdout, "DIRECTORY INODE %d NAME %s INVALID INODE %d\n", directoryInodeNum, name, inodeNum);
         return;
     }
-    if(freeInodes[inodeNum] == 1) {
-        fprintf(stdout, "DIRECTORY INODE %d NAME %s UNALLOCATED INODE %d\n", directoryInodeNum, name, inodeNum);
-        return;
-    }
 
-
+    //If looking at CWD entry, ensure it is pointing to current directory
     if(strcmp(name, "\'.\'") == 0) {
-        if (inodeNum == 2)
-            allocatedInodes[inodeNum].actualParent = 2;
-        if (directoryInodeNum != inodeNum)
-            fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
+      if (directoryInodeNum != inodeNum)
+	fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
     }
+    //If looking at parent directory entry, store given parent 
     else if (strcmp(name, "\'..\'") == 0){
-        allocatedInodes[directoryInodeNum].providedParentFromDotDot = inodeNum;
+      allocatedInodes[directoryInodeNum].providedParentFromDotDot = inodeNum;
     }
-    else
-        allocatedInodes[inodeNum].actualParent = directoryInodeNum;
-
+    //If normal directory entry, store directory entry info and the parent of this inode as the directory entry
+    else {
+      allocatedInodes[inodeNum].actualParent = directoryInodeNum;
+      dirEntries[inodeNum].name = name;
+      dirEntries[inodeNum].directoryInode = directoryInodeNum;
+      dirEntries[inodeNum].inodeNum = inodeNum;
+    }
+  
+    //Add to link counts
     allocatedInodes[inodeNum].directoryLinks++;
+
 }
 
-void testDirectBlocksInInode(char* str) {
-    char * tok = strtok(str, ",");
-
-  }
-
+//Go through all blocks and check if there are any that are not on free list and not on allocated and not reserved
 void testUnreferencedBlocks() {
     int i;
     for (i = 1; i < numBlocks; i++) {
@@ -313,6 +316,7 @@ void testUnreferencedBlocks() {
     }
 }
 
+//Go through all blocks and ensure that there are no blocks on free list and allocated
 void testAllocatedBlocksConsistency() {
     int i;
     for (i = 1; i < numBlocks; i++) {
@@ -321,23 +325,28 @@ void testAllocatedBlocksConsistency() {
     }
 }
 
+
 void testInodeAllocation() {
-    int i;
+  int i;
     for (i = 2; i <= numInodes; i++) {
+      //If inode is on free list and is allocated, report error
         if (allocatedInodes[i].inodeNum != 0 && freeInodes[i] == 1)
             fprintf(stdout, "ALLOCATED INODE %d ON FREELIST\n", i);
+	//If inode is not allocated but not on free list, report error
         else if (allocatedInodes[i].inodeNum == 0 && freeInodes[i] == 0)
             fprintf(stdout, "UNALLOCATED INODE %d NOT ON FREELIST\n", i);
-
-        if(allocatedInodes[i].linkCount != allocatedInodes[i].directoryLinks)
+	//If inode is allocated, and the link count provided does not match number of links in directory entries, report error
+        if(allocatedInodes[i].inodeNum != 0 &&  allocatedInodes[i].linkCount != allocatedInodes[i].directoryLinks)
             fprintf(stdout, "INODE %d HAS %u LINKS BUT LINKCOUNT IS %u\n", i, allocatedInodes[i].directoryLinks, allocatedInodes[i].linkCount);
-
+	//If inode is not allocated but there is a directory entry for the inode number
+	if(dirEntries[i].inodeNum != 0 && allocatedInodes[i].inodeNum == 0)
+	  fprintf(stdout, "DIRECTORY INODE %d NAME %s UNALLOCATED INODE %d\n", dirEntries[i].directoryInode, dirEntries[i].name, dirEntries[i].inodeNum);
+	//If inode is directory, check to see if it's actual parent matches the parent provided by .. file
         if(allocatedInodes[i].fileType == 'd') {
             if(allocatedInodes[i].actualParent != allocatedInodes[i].providedParentFromDotDot)
                 fprintf(stdout, "DIRECTORY INODE %u NAME '..' LINK TO INODE %u SHOULD BE %u\n", allocatedInodes[i].inodeNum, allocatedInodes[i].providedParentFromDotDot, allocatedInodes[i].inodeNum);
         }
     }
-
 }
 
 int
@@ -355,7 +364,12 @@ main (int argc, char **argv)
   //Check to see if we can open provided csv
   char * csvFile = argv[1];
 
+  //Open file, if not opened, 
   FILE* stream = fopen(csvFile, "r");
+  if(stream == NULL) {
+    fprintf(stderr, "USAGE: ./lab3b FILENAME.csv\n");
+    exit(1);
+  }
   char line[1024];
   while (fgets(line, 1024, stream)) {
       char * temp = strdup(line);
@@ -374,6 +388,9 @@ main (int argc, char **argv)
             memset(freeInodes, 0, sizeof(int) * (numInodes+1));
             allocatedInodes = (struct allocatedInode *) malloc(sizeof(struct allocatedInode) * (numInodes+1));
             memset(allocatedInodes, 0, sizeof(struct allocatedInode) * (numInodes+1));
+	    dirEntries = (struct dirEntry *) malloc(sizeof(struct dirEntry) * (numInodes + 1));
+	    memset(dirEntries, 0, sizeof(struct dirEntry) * (numInodes+1));
+	    allocatedInodes[2].actualParent = 2;
 
             int counter = 3;
             for (; counter < firstNonreservedInode; counter ++)
@@ -385,7 +402,8 @@ main (int argc, char **argv)
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
         int inodeTableBlocks = numInodes / inodesPerBlock;
 	reservedBlockMax = 4 + inodeTableBlocks;
-
+	if(BLOCK_SIZE > 1024) 
+	  reservedBlockMax--;
       }
       else if (strcmp(pch, "BFREE") == 0) {
         getBlockFreeListInfo(line);
