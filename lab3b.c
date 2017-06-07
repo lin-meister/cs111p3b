@@ -26,8 +26,16 @@ struct allocatedBlock {
 struct allocatedInode {
     unsigned int inodeNum;
     unsigned int linkCount;
+<<<<<<< HEAD
     unsigned int directoryLinks;
 };
+=======
+    unsigned int directoryLinks;
+    unsigned int actualParent;
+    unsigned int providedParentFromDotDot;
+    char fileType;
+};
+>>>>>>> 67fc0daeefd477366e45f5f26e7a5d5101d0e5ba
 
 int * freeBlocks;
 struct allocatedBlock * allocatedBlocks;
@@ -81,7 +89,7 @@ int isValidBlockNum(int block) {
 }
 
 int isValidInodeNum(int num) {
-  if(num <= numInodes && num > 0)
+  if((num <= numInodes && num >= firstNonreservedInode) || num == 2  )
     return 1;
   else return 0;
 }
@@ -140,24 +148,38 @@ char* getIndirection (unsigned int offset)
 void getInodeInfo(char* str) {
     char* tok = strtok(str, ",");
 
+    char fileType;
     int num = 1, inodeNum = 0, blockNum = 0, linkCount = 0, level = 0, mode = 0;
     for (; num < 13; num++) {
         if (num == 2) inodeNum = atoi(tok);
+        else if(num == 3) fileType = tok[0];
         else if (num == 4) mode = atoi(tok);
         else if (num == 7) linkCount = atoi(tok);
         tok = strtok(NULL, ",");
     }
 
+<<<<<<< HEAD
     if(mode == 0)
         return;
 
+=======
+
+>>>>>>> 67fc0daeefd477366e45f5f26e7a5d5101d0e5ba
     if (isValidInodeNum(inodeNum)) {
+        if(mode == 0)
+            return;
         allocatedInodes[inodeNum].inodeNum = inodeNum;
         allocatedInodes[inodeNum].linkCount = linkCount;
+        allocatedInodes[inodeNum].fileType = fileType;
     }
-    else
+    else    {
         fprintf(stdout, "INVALID INODE %d\n", inodeNum);
+<<<<<<< HEAD
 
+=======
+        return;
+    }
+>>>>>>> 67fc0daeefd477366e45f5f26e7a5d5101d0e5ba
     int offset = 0;
     char * indirect = "";
 
@@ -259,15 +281,42 @@ void getIndirectBlock(char *str) {
 void getDirectoryEntry(char *str) {
     char * tok = strtok(str, ",");
 
-    int num = 1, inode = 0;
+    int num = 1, inodeNum = 0, directoryInodeNum = 0, nameLength = 0;
     char* name;
     for (; tok != NULL; tok = strtok(NULL, ","), num++) {
-        if(num == 4) inode = atoi(tok);
+        if(num == 2) directoryInodeNum = atoi(tok);
+        if(num == 4) inodeNum = atoi(tok);
+        if(num == 6) nameLength = atoi(tok);
         if(num == 7) name = strdup(tok);
     }
+    name[nameLength+2] = '\0';
 
-    allocatedInodes[inode].directoryLinks++;
+    if(isValidInodeNum(inodeNum) == 0) {
+        fprintf(stdout, "DIRECTORY INODE %d NAME %s INVALID INODE %d\n", directoryInodeNum, name, inodeNum);
+        return;
+    }
+    if(freeInodes[inodeNum] == 1){
+        fprintf(stdout, "DIRECTORY INODE %d NAME %s UNALLOCATED INODE %d\n", directoryInodeNum, name, inodeNum);
+        return;
+    }
 
+    if(strcmp(name, ".") == 0 && inodeNum == 2)
+        allocatedInodes[inodeNum].actualParent = 2;
+    else if(strcmp(name, ".") == 0 && directoryInodeNum != inodeNum)
+        fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
+    //else if(strcmp(name, "..") == 0 && directoryInodeNum == 2)
+        //fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
+    else if(strcmp(name,"..") == 0) {
+        printf("reached\n");
+        allocatedInodes[directoryInodeNum].providedParentFromDotDot = inodeNum;
+    }
+    else
+        allocatedInodes[inodeNum].actualParent = directoryInodeNum;
+
+
+    allocatedInodes[inodeNum].directoryLinks++;
+
+>>>>>>> 67fc0daeefd477366e45f5f26e7a5d5101d0e5ba
 }
 
 void testDirectBlocksInInode(char* str) {
@@ -301,6 +350,11 @@ void testInodeAllocation() {
 
         if(allocatedInodes[i].linkCount != allocatedInodes[i].directoryLinks)
             fprintf(stdout, "INODE %d HAS %u LINKS BUT LINKCOUNT IS %u\n", i, allocatedInodes[i].directoryLinks, allocatedInodes[i].linkCount);
+
+        if(allocatedInodes[i].fileType == 'd'){
+            if(allocatedInodes[i].actualParent != allocatedInodes[i].providedParentFromDotDot)
+                fprintf(stdout, "DIRECTORY INODE %u NAME '..' LINK TO INODE %u SHOULD BE %u\n", allocatedInodes[i].inodeNum, allocatedInodes[i].providedParentFromDotDot, allocatedInodes[i].inodeNum);
+        }
     }
 
 }
