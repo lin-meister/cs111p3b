@@ -8,7 +8,7 @@ default: lab3b.c
 	chmod +x ./$(EXECNAME)
 
 dist:
-	tar -cvzf lab3b-104132751.tar.gz lab3b.c README
+	tar -cvzf lab3b-104132751.tar.gz lab3b.c Makefile README
 
 clean:
 	rm -f $(EXECNAME) *.tar.gz *~
