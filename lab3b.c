@@ -45,7 +45,7 @@ void freeMemory()
     free(freeBlocks);
   if (freeInodes != NULL)
     free(freeInodes);
-  
+
   //  free(superBlock);
   //  free(groupBlock);
   //  free(blockBitmap);
@@ -150,14 +150,14 @@ void getInodeInfo(char* str) {
 
     if(mode == 0)
         return;
-    
+
     if (isValidInodeNum(inodeNum)) {
         allocatedInodes[inodeNum].inodeNum = inodeNum;
         allocatedInodes[inodeNum].linkCount = linkCount;
     }
     else
         fprintf(stdout, "INVALID INODE %d\n", inodeNum);
-    
+
     int offset = 0;
     char * indirect = "";
 
@@ -265,9 +265,9 @@ void getDirectoryEntry(char *str) {
         if(num == 4) inode = atoi(tok);
         if(num == 7) name = strdup(tok);
     }
-    
+
     allocatedInodes[inode].directoryLinks++;
-    
+
 }
 
 void testDirectBlocksInInode(char* str) {
@@ -298,11 +298,11 @@ void testInodeAllocation() {
             fprintf(stdout, "ALLOCATED INODE %d ON FREELIST\n", i);
         else if (allocatedInodes[i].inodeNum == 0 && freeInodes[i] == 0)
             fprintf(stdout, "UNALLOCATED INODE %d NOT ON FREELIST\n", i);
-        
+
         if(allocatedInodes[i].linkCount != allocatedInodes[i].directoryLinks)
             fprintf(stdout, "INODE %d HAS %u LINKS BUT LINKCOUNT IS %u\n", i, allocatedInodes[i].directoryLinks, allocatedInodes[i].linkCount);
     }
-    
+
 }
 
 int
@@ -339,14 +339,14 @@ main (int argc, char **argv)
             memset(freeInodes, 0, sizeof(int) * (numInodes+1));
             allocatedInodes = (struct allocatedInode *) malloc(sizeof(struct allocatedInode) * (numInodes+1));
             memset(allocatedInodes, 0, sizeof(struct allocatedInode) * (numInodes+1));
-            
+
             int counter = 3;
             for (; counter < firstNonreservedInode; counter ++)
                 allocatedInodes[counter].inodeNum = counter;
         }
 
 
-          
+
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
         int inodeTableBlocks = numInodes / inodesPerBlock;
 	reservedBlockMax = 4 + inodeTableBlocks;
