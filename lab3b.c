@@ -13,6 +13,7 @@ int csvFileSize;
 
 int numBlocks, numInodes;
 int reservedBlockMax;
+int firstNonreservedInode;
 
 struct allocatedBlock {
     unsigned int blockNum;
@@ -24,15 +25,14 @@ struct allocatedBlock {
 
 struct allocatedInode {
     unsigned int inodeNum;
-    unsigned int links;
+    unsigned int linkCount;
+    unsigned int directoryLinks;
 };
 
 int * freeBlocks;
 struct allocatedBlock * allocatedBlocks;
 int * freeInodes;
 struct allocatedInode * allocatedInodes;
-
-char * inodeStatus;
 
 int fd;
 
@@ -43,8 +43,9 @@ void freeMemory()
     free(csv);
   if (freeBlocks != NULL)
     free(freeBlocks);
-  if (inodeStatus != NULL)
-    free(inodeStatus);
+  if (freeInodes != NULL)
+    free(freeInodes);
+  
   //  free(superBlock);
   //  free(groupBlock);
   //  free(blockBitmap);
@@ -67,6 +68,7 @@ void getSuperblockInfo(char* str) {
     else if (num == 3) numInodes = atoi(tok);
     else if (num == 4) BLOCK_SIZE = atoi(tok);
     else if (num == 5) INODE_SIZE = atoi(tok);
+    else if (num == 8) firstNonreservedInode = atoi(tok);
   }
 }
 
@@ -112,7 +114,7 @@ void getInodeFreeListInfo(char* str) {
           if(isValidInodeNum(inodeNum))
               freeInodes[inodeNum] = 1;
           else
-              printf("INVALID INODE %d IN FREE LIST\n", inodeNum);
+              fprintf(stdout, "INVALID INODE %d IN FREE LIST\n", inodeNum);
         }
   }
 }
@@ -138,18 +140,24 @@ char* getIndirection (unsigned int offset)
 void getInodeInfo(char* str) {
     char* tok = strtok(str, ",");
 
-    int num = 1, inodeNum = 0, blockNum = 0, linkCount = 0, level = 0;
+    int num = 1, inodeNum = 0, blockNum = 0, linkCount = 0, level = 0, mode = 0;
     for (; num < 13; num++) {
         if (num == 2) inodeNum = atoi(tok);
+        else if (num == 4) mode = atoi(tok);
         else if (num == 7) linkCount = atoi(tok);
         tok = strtok(NULL, ",");
     }
 
+    if(mode == 0)
+        return;
+    
     if (isValidInodeNum(inodeNum)) {
         allocatedInodes[inodeNum].inodeNum = inodeNum;
-        allocatedInodes[inodeNum].links = linkCount;
+        allocatedInodes[inodeNum].linkCount = linkCount;
     }
-
+    else
+        fprintf(stdout, "INVALID INODE %d\n", inodeNum);
+    
     int offset = 0;
     char * indirect = "";
 
@@ -248,6 +256,20 @@ void getIndirectBlock(char *str) {
 }
 */
 
+void getDirectoryEntry(char *str) {
+    char * tok = strtok(str, ",");
+
+    int num = 1, inode = 0;
+    char* name;
+    for (; tok != NULL; tok = strtok(NULL, ","), num++) {
+        if(num == 4) inode = atoi(tok);
+        if(num == 7) name = strdup(tok);
+    }
+    
+    allocatedInodes[inode].directoryLinks++;
+    
+}
+
 void testDirectBlocksInInode(char* str) {
     char * tok = strtok(str, ",");
 
@@ -255,7 +277,7 @@ void testDirectBlocksInInode(char* str) {
 
 void testUnreferencedBlocks() {
     int i;
-    for (i = 0; i < numBlocks; i++) {
+    for (i = 1; i < numBlocks; i++) {
         if (freeBlocks[i] == 0 && allocatedBlocks[i].blockNum == 0 && i > reservedBlockMax)
             fprintf(stdout, "UNREFERENCED BLOCK %d\n", i);
     }
@@ -263,7 +285,7 @@ void testUnreferencedBlocks() {
 
 void testAllocatedBlocksConsistency() {
     int i;
-    for (i = 0; i < numBlocks; i++) {
+    for (i = 1; i < numBlocks; i++) {
         if(allocatedBlocks[i].blockNum != 0 && freeBlocks[i] == 1)
             fprintf(stdout, "ALLOCATED BLOCK %d ON FREELIST\n", i);
     }
@@ -271,12 +293,16 @@ void testAllocatedBlocksConsistency() {
 
 void testInodeAllocation() {
     int i;
-    for (i = 0; i < numInodes; i++) {
+    for (i = 2; i <= numInodes; i++) {
         if (allocatedInodes[i].inodeNum != 0 && freeInodes[i] == 1)
             fprintf(stdout, "ALLOCATED INODE %d ON FREELIST\n", i);
         else if (allocatedInodes[i].inodeNum == 0 && freeInodes[i] == 0)
             fprintf(stdout, "UNALLOCATED INODE %d NOT ON FREELIST\n", i);
+        
+        if(allocatedInodes[i].linkCount != allocatedInodes[i].directoryLinks)
+            fprintf(stdout, "INODE %d HAS %u LINKS BUT LINKCOUNT IS %u\n", i, allocatedInodes[i].directoryLinks, allocatedInodes[i].linkCount);
     }
+    
 }
 
 int
@@ -289,7 +315,7 @@ main (int argc, char **argv)
   }
 
   numBlocks = -1, numInodes = -1;
-  csv = NULL, allocatedBlocks = NULL, freeBlocks = NULL, inodeStatus = NULL;
+  csv = NULL, allocatedBlocks = NULL, freeBlocks = NULL, allocatedInodes = NULL, freeInodes = NULL;
 
   //Check to see if we can open provided csv
   char * csvFile = argv[1];
@@ -307,28 +333,37 @@ main (int argc, char **argv)
             memset(freeBlocks, 0, sizeof(int) * numBlocks);
             allocatedBlocks = (struct allocatedBlock *) malloc(sizeof(struct allocatedBlock) * numBlocks);
             memset(allocatedBlocks, 0, sizeof(struct allocatedBlock) * numBlocks);
-            freeInodes = (int*) malloc(sizeof(int) * (numInodes));
-            memset(freeInodes, 0, sizeof(int) * numInodes);
-            allocatedInodes = (struct allocatedInode *) malloc(sizeof(struct allocatedInode) * numInodes);
-            memset(allocatedInodes, 0, sizeof(struct allocatedInode) * numInodes);
+        }
+        if (numInodes > -1) {
+            freeInodes = (int*) malloc(sizeof(int) * (numInodes+1));
+            memset(freeInodes, 0, sizeof(int) * (numInodes+1));
+            allocatedInodes = (struct allocatedInode *) malloc(sizeof(struct allocatedInode) * (numInodes+1));
+            memset(allocatedInodes, 0, sizeof(struct allocatedInode) * (numInodes+1));
+            
+            int counter = 3;
+            for (; counter < firstNonreservedInode; counter ++)
+                allocatedInodes[counter].inodeNum = counter;
         }
 
+
+          
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
         int inodeTableBlocks = numInodes / inodesPerBlock;
 	reservedBlockMax = 4 + inodeTableBlocks;
-
-	inodeStatus = (char*) malloc(sizeof(char) * numInodes);
 
       }
       else if (strcmp(pch, "BFREE") == 0) {
         getBlockFreeListInfo(line);
       }
       else if (strcmp(pch, "IFREE") == 0) {
-        // getInodeFreeListInfo(line);
+        getInodeFreeListInfo(line);
       }
       else if (strcmp(pch, "INODE") == 0) {
           // the direct block info is all in the inode rows
         getInodeInfo(line);
+      }
+      else if (strcmp(pch, "DIRENT") == 0) {
+        getDirectoryEntry(line);
       }
       else if (strcmp(pch, "INDIRECT") == 0) {
         getIndirectBlock(line);
@@ -343,7 +378,7 @@ main (int argc, char **argv)
   // }
     testUnreferencedBlocks();
     testAllocatedBlocksConsistency();
-
+    testInodeAllocation();
   // Free memory
   freeMemory();
 
