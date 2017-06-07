@@ -1,4 +1,3 @@
-
 CC=gcc
 CFLAGS=-lm -o
 EXECNAME=lab3b
