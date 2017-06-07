@@ -20,6 +20,8 @@ int numBlocks, numInodes;
 int reservedBlockMax;
 int firstNonreservedInode;
 
+int numErrors = 0;
+
 struct allocatedBlock {
     unsigned int blockNum;
     unsigned int parentInode;
@@ -75,6 +77,7 @@ void error(char* msg)
   exit(2);
 }
 
+//Read superblock and setup initial data from it
 void getSuperblockInfo(char* str) {
   char * tok = strtok(str, ",");
 
@@ -88,6 +91,7 @@ void getSuperblockInfo(char* str) {
   }
 }
 
+//Confirm block number is valid
 int isValidBlockNum(int block) {
     if(block < numBlocks && block > reservedBlockMax)
         return 1;
@@ -96,12 +100,14 @@ int isValidBlockNum(int block) {
     else return -1; //invalid block
 }
 
+//Confirm inode number is valid
 int isValidInodeNum(int num) {
   if((num <= numInodes && num >= firstNonreservedInode) || num == 2  )
     return 1;
   else return 0;
 }
 
+//Read block from free list
 void getBlockFreeListInfo(char* str) {
     char* tok = strtok(str, ",");
   int num = 1;
@@ -109,32 +115,39 @@ void getBlockFreeListInfo(char* str) {
     if (num == 2)
       {
 	int blockNum = atoi(tok);
-    int rc = isValidBlockNum(blockNum);
+	int rc = isValidBlockNum(blockNum);
 	if (rc == 1)
 	  freeBlocks[blockNum] = 1;
-	else if (rc == 0)
+	else if (rc == 0) {
 	  fprintf(stdout, "RESERVED BLOCK %d IN FREE LIST\n", blockNum);
-    else
-        fprintf(stdout, "INVALID BLOCK %d IN FREE LIST\n", blockNum);
-
+	  numErrors++;
+	}
+	else {
+	  fprintf(stdout, "INVALID BLOCK %d IN FREE LIST\n", blockNum);
+	  numErrors++;
+	}
       }
   }
 }
 
+//Read inode from free list
 void getInodeFreeListInfo(char* str) {
     char* tok = strtok(str, ",");
-  int num = 1;
-  for (; tok != NULL; tok = strtok(NULL, ","), num++) {
+    int num = 1;
+    for (; tok != NULL; tok = strtok(NULL, ","), num++) {
       if (num == 2) {
-          int inodeNum = atoi(tok);
-          if(isValidInodeNum(inodeNum))
-              freeInodes[inodeNum] = 1;
-          else
-              fprintf(stdout, "INVALID INODE %d IN FREE LIST\n", inodeNum);
-        }
-  }
+	int inodeNum = atoi(tok);
+	if(isValidInodeNum(inodeNum))
+	  freeInodes[inodeNum] = 1;
+	else {
+	  fprintf(stdout, "INVALID INODE %d IN FREE LIST\n", inodeNum);
+	  numErrors++;
+	}
+      }
+    }
 }
 
+//Names stored on heap
 char* indirect = "INDIRECT ";
 char* doubleIndirect = "DOUBLE INDIRECT ";
 char* trippleIndirect = "TRIPPLE INDIRECT ";
@@ -369,43 +382,50 @@ main (int argc, char **argv)
   //Check to see if we can open provided csv
   char * csvFile = argv[1];
 
-  //Open file, if not opened, 
+  //Open file, if not opened, report error and exit
   FILE* stream = fopen(csvFile, "r");
   if(stream == NULL) {
     fprintf(stderr, "USAGE: ./lab3b FILENAME.csv\n");
     exit(1);
   }
+ 
+  //Go line by line and interpret and store data from CSV
   char line[1024];
   while (fgets(line, 1024, stream)) {
       char * temp = strdup(line);
       char * pch = strtok(temp, ",");
+      //Get the first word from read in line and then forward to proper function to handle line type
       if (strcmp(pch, "SUPERBLOCK") == 0) {
         getSuperblockInfo(line);
         if (numBlocks > -1)
         {
+	  //Setup data structures for blocks
             freeBlocks = (int*) malloc(sizeof(int) * (numBlocks));
             memset(freeBlocks, 0, sizeof(int) * numBlocks);
             allocatedBlocks = (struct allocatedBlock *) malloc(sizeof(struct allocatedBlock) * numBlocks);
             memset(allocatedBlocks, 0, sizeof(struct allocatedBlock) * numBlocks);
         }
         if (numInodes > -1) {
+	  //Setup data structures for blocks and inodes
             freeInodes = (int*) malloc(sizeof(int) * (numInodes+1));
             memset(freeInodes, 0, sizeof(int) * (numInodes+1));
             allocatedInodes = (struct allocatedInode *) malloc(sizeof(struct allocatedInode) * (numInodes+1));
             memset(allocatedInodes, 0, sizeof(struct allocatedInode) * (numInodes+1));
 	    dirEntries = (struct dirEntry *) malloc(sizeof(struct dirEntry) * (numInodes + 1));
 	    memset(dirEntries, 0, sizeof(struct dirEntry) * (numInodes+1));
+	    //Set the actual parent for root inode to itself as there will be no dirents for the root
 	    allocatedInodes[2].actualParent = 2;
 
-            int counter = 3;
-            for (; counter < firstNonreservedInode; counter ++)
+	    //Set the reserved inodes as allocated so they are not marked as unallocated and not in free list
+            int counter;
+            for (counter = 3; counter < firstNonreservedInode; counter ++)
                 allocatedInodes[counter].inodeNum = counter;
         }
 
-
-
+	//Determine the number of blocks taken by inode table block
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
         int inodeTableBlocks = numInodes / inodesPerBlock;
+	//Set reserved block max number, decrement by one if block size is larger than 1kb due to EXT2 structure
 	reservedBlockMax = 4 + inodeTableBlocks;
 	if(BLOCK_SIZE > 1024) 
 	  reservedBlockMax--;
@@ -429,14 +449,11 @@ main (int argc, char **argv)
       free(temp);
   }
 
-  // printf("%d,%d\n", numBlocks, numInodes);
-  // int i;
-  // for (i = 0; i < numBlocks; i++) {
-  //     printf("%d:%c\n", i, blockStatus[i]);
-  // }
+  //Test all data structures
     testUnreferencedBlocks();
     testAllocatedBlocksConsistency();
     testInodeAllocation();
+
   // Free memory
   freeMemory();
 
