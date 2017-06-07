@@ -6,6 +6,43 @@ Included files
 ======
 
 lab3b.c is the source module that takes a CSV file as an argument and reports any
-inconsistencies in it, given the information in the CSV. The main types of 
+inconsistencies in it, given the information in the CSV. The main types of
 inconsistencies include that of block, inode, and directory entries with respect to the
 information in the superblock, free list, as well as other areas.
+
+Makefile contains the code to build, run, clean, and make a tarball distribution
+of the included files.
+
+README contains a description of the project in general.
+
+Slip day use
+======
+
+We would like to use one (1) slip day (from our combined slip days, as per
+the Piazza post) for this project.
+Nikhil Bhatia's slip days after use: 3
+Chaoran Lin's slip days after use: 3
+
+Referenced Links
+======
+
+http://www.nongnu.org/ext2-doc/ext2.html
+https://piazza-resources.s3.amazonaws.com/il71xfllx3l16f/inz4wsb2m0w2oz/
+ext2.pdf?AWSAccessKeyId=AKIAIEDNRLJ4AZKBW6HA&Expires=1496749225&Signature=
+9HC8%2B1mHder7NGS%2FmuMXAfRDP7k%3D
+
+Testing
+======
+
+We used the test scripts used in the sanity check script to debug and fix
+errors on our code.
+
+Limitations
+======
+
+No limitations.
+
+Features
+======
+
+All expected features.
