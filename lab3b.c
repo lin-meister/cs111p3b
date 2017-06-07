@@ -27,6 +27,9 @@ struct allocatedInode {
     unsigned int inodeNum;
     unsigned int linkCount;
     unsigned int directoryLinks;
+    unsigned int actualParent;
+    unsigned int providedParentFromDotDot;
+    char fileType;
 };
 
 int * freeBlocks;
@@ -140,9 +143,11 @@ char* getIndirection (unsigned int offset)
 void getInodeInfo(char* str) {
     char* tok = strtok(str, ",");
 
+    char fileType;
     int num = 1, inodeNum = 0, blockNum = 0, linkCount = 0, level = 0, mode = 0;
     for (; num < 13; num++) {
         if (num == 2) inodeNum = atoi(tok);
+        else if(num == 3) fileType = tok[0];
         else if (num == 4) mode = atoi(tok);
         else if (num == 7) linkCount = atoi(tok);
         tok = strtok(NULL, ",");
@@ -154,6 +159,7 @@ void getInodeInfo(char* str) {
             return;
         allocatedInodes[inodeNum].inodeNum = inodeNum;
         allocatedInodes[inodeNum].linkCount = linkCount;
+        allocatedInodes[inodeNum].fileType = fileType;
     }
     else    {
         fprintf(stdout, "INVALID INODE %d\n", inodeNum);
@@ -279,10 +285,18 @@ void getDirectoryEntry(char *str) {
         return;
     }
     
-    if(strcmp(name, ".") == 0 && directoryInodeNum != inodeNum)
+    if(strcmp(name, ".") == 0 && inodeNum == 2)
+        allocatedInodes[inodeNum].actualParent = 2;
+    else if(strcmp(name, ".") == 0 && directoryInodeNum != inodeNum)
         fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
-    else if(strcmp(name, "..") == 0 && directoryInodeNum == 2)
-        fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
+    //else if(strcmp(name, "..") == 0 && directoryInodeNum == 2)
+        //fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
+    else if(strcmp(name,"..") == 0) {
+        printf("reached\n");
+        allocatedInodes[directoryInodeNum].providedParentFromDotDot = inodeNum;
+    }
+    else
+        allocatedInodes[inodeNum].actualParent = directoryInodeNum;
         
     
     allocatedInodes[inodeNum].directoryLinks++;
@@ -320,6 +334,11 @@ void testInodeAllocation() {
         
         if(allocatedInodes[i].linkCount != allocatedInodes[i].directoryLinks)
             fprintf(stdout, "INODE %d HAS %u LINKS BUT LINKCOUNT IS %u\n", i, allocatedInodes[i].directoryLinks, allocatedInodes[i].linkCount);
+        
+        if(allocatedInodes[i].fileType == 'd'){
+            if(allocatedInodes[i].actualParent != allocatedInodes[i].providedParentFromDotDot)
+                fprintf(stdout, "DIRECTORY INODE %u NAME '..' LINK TO INODE %u SHOULD BE %u\n", allocatedInodes[i].inodeNum, allocatedInodes[i].providedParentFromDotDot, allocatedInodes[i].inodeNum);
+        }
     }
     
 }
