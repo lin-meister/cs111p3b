@@ -1,8 +1,7 @@
-/*
-NAME: Nikhil Bhatia, Chaoran Lin
-UID: 104132751, 004674598
-EMAIL: nbhatia823@ucla.edu, linmc@ucla.edu
-*/
+//NAME: Nikhil Bhatia, Chaoran Lin
+//UID: 104132751, 004674598
+//EMAIL: nbhatia823@ucla.edu, linmc@ucla.edu
+
 
 #include <stdio.h>
 #include <sys/types.h>
