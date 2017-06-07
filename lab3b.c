@@ -43,11 +43,11 @@ struct dirEntry {
   char* name;
 };
 
-int * freeBlocks; 
+int * freeBlocks;
 struct allocatedBlock * allocatedBlocks;
 int * freeInodes;
 struct allocatedInode * allocatedInodes;
-struct dirEntry * dirEntries; 
+struct dirEntry * dirEntries;
 
 
 int fd;
@@ -59,13 +59,20 @@ void freeMemory()
     free(csv);
   if (freeBlocks != NULL)
     free(freeBlocks);
+  if (allocatedBlocks != NULL)
+    free(allocatedBlocks);
   if (freeInodes != NULL)
     free(freeInodes);
-
-  //  free(superBlock);
-  //  free(groupBlock);
-  //  free(blockBitmap);
-  //  free(inodeBitmap);
+  if (allocatedInodes != NULL)
+    free(allocatedInodes);
+  if (dirEntries != NULL) {
+    int i;
+    for (i = 0; i < numInodes+1; i++) {
+      if (dirEntries[i].inodeNum != 0)
+        free(dirEntries[i].name);
+    }
+    free(dirEntries);
+  }
 }
 
 //Error return function
@@ -282,7 +289,7 @@ void getDirectoryEntry(char *str) {
     }
 
     //Replace newline characrter with nullbyte at end of name
-    name[nameLength+2] = '\0';    
+    name[nameLength+2] = '\0';
 
     //Check if inodeNum is valid, if not print error
     if(isValidInodeNum(inodeNum) == 0) {
@@ -295,7 +302,7 @@ void getDirectoryEntry(char *str) {
       if (directoryInodeNum != inodeNum)
 	fprintf(stdout, "DIRECTORY INODE %d NAME %s LINK TO INODE %d SHOULD BE %d\n", directoryInodeNum, name, inodeNum, directoryInodeNum);
     }
-    //If looking at parent directory entry, store given parent 
+    //If looking at parent directory entry, store given parent
     else if (strcmp(name, "\'..\'") == 0){
       allocatedInodes[directoryInodeNum].providedParentFromDotDot = inodeNum;
     }
@@ -306,7 +313,7 @@ void getDirectoryEntry(char *str) {
       dirEntries[inodeNum].directoryInode = directoryInodeNum;
       dirEntries[inodeNum].inodeNum = inodeNum;
     }
-  
+
     //Add to link counts
     allocatedInodes[inodeNum].directoryLinks++;
 
@@ -364,12 +371,12 @@ main (int argc, char **argv)
   }
 
   numBlocks = -1, numInodes = -1;
-  csv = NULL, allocatedBlocks = NULL, freeBlocks = NULL, allocatedInodes = NULL, freeInodes = NULL;
+  csv = NULL, allocatedBlocks = NULL, freeBlocks = NULL, allocatedInodes = NULL, freeInodes = NULL, dirEntries = NULL;
 
   //Check to see if we can open provided csv
   char * csvFile = argv[1];
 
-  //Open file, if not opened, 
+  //Open file, if not opened,
   FILE* stream = fopen(csvFile, "r");
   if(stream == NULL) {
     fprintf(stderr, "USAGE: ./lab3b FILENAME.csv\n");
@@ -402,12 +409,10 @@ main (int argc, char **argv)
                 allocatedInodes[counter].inodeNum = counter;
         }
 
-
-
         int inodesPerBlock = BLOCK_SIZE/INODE_SIZE;
         int inodeTableBlocks = numInodes / inodesPerBlock;
 	reservedBlockMax = 4 + inodeTableBlocks;
-	if(BLOCK_SIZE > 1024) 
+	if(BLOCK_SIZE > 1024)
 	  reservedBlockMax--;
       }
       else if (strcmp(pch, "BFREE") == 0) {
@@ -429,11 +434,7 @@ main (int argc, char **argv)
       free(temp);
   }
 
-  // printf("%d,%d\n", numBlocks, numInodes);
-  // int i;
-  // for (i = 0; i < numBlocks; i++) {
-  //     printf("%d:%c\n", i, blockStatus[i]);
-  // }
+
     testUnreferencedBlocks();
     testAllocatedBlocksConsistency();
     testInodeAllocation();
